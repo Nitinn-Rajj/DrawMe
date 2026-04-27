@@ -1,0 +1,58 @@
+{
+  "timestamp_utc": "2026-04-27T21:18:07.963476Z",
+  "runtime": {
+    "gpu_available": true,
+    "gpu_enabled": true,
+    "gpu_count": 1,
+    "mixed_precision": true,
+    "seed": 42
+  },
+  "dataset": {
+    "categories": 15,
+    "samples_per_class": 200000,
+    "img_size": 28
+  },
+  "model": {
+    "name": "DrawMe_CNN_high_end_v2",
+    "conv_filters": [
+      80,
+      160,
+      256,
+      384
+    ],
+    "kernel_size": [
+      3,
+      3
+    ],
+    "dense_units": [
+      640,
+      320
+    ],
+    "dropout": 0.35,
+    "learning_rate": 0.0005
+  },
+  "training": {
+    "epochs": 3,
+    "batch_size": 256,
+    "test_split": 0.2,
+    "validation_split": 0.1,
+    "lr_factor": 0.5,
+    "lr_patience": 3,
+    "min_lr": 5e-07,
+    "early_stopping_patience": 6
+  },
+  "evaluation": {
+    "test_loss": 0.21701838076114655,
+    "test_accuracy": 0.9326397180557251
+  },
+  "timing": {
+    "epochs_ran": 3,
+    "epoch_durations_sec": [
+      546.491246594,
+      562.239691339,
+      560.6816090649997
+    ],
+    "total_training_sec": 1669.4125469979997,
+    "avg_epoch_sec": 556.4708489993333
+  }
+}

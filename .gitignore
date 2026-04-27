@@ -2,7 +2,7 @@
 data/
 
 # Model files
-model/saved/
+# model/saved/
 
 # Python
 __pycache__/
@@ -15,6 +15,7 @@ build/
 
 # Virtual environment
 venv/
+wsl_venv/
 .venv/
 env/
 
