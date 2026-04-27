@@ -2,7 +2,7 @@
 
 An AI-powered drawing recognition app that uses a Convolutional Neural Network (CNN) trained on Google's [Quick, Draw!](https://quickdraw.withgoogle.com/data) dataset to identify hand-drawn doodles in real-time.
 
-![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10--3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-2.x-000000?style=flat-square&logo=flask&logoColor=white)
 
@@ -48,6 +48,8 @@ source venv/bin/activate       # macOS/Linux
 pip install -r requirements.txt
 ```
 
+Use Python 3.10-3.12 (recommended: 3.11). TensorFlow wheels are typically not available yet for very new Python versions.
+
 ### 2. Download the Dataset
 ```bash
 python model/download_data.py
@@ -56,9 +58,36 @@ Downloads 15 categories (~1.5 GB total) from Google Cloud Storage.
 
 ### 3. Train the Model
 ```bash
-python model/train.py
+python model/train.py --profile small_machine
 ```
-Trains a CNN for ~15 epochs. Saves `drawme_model.h5` to `model/saved/`.
+This runs the resource-friendly profile for smaller machines.
+
+For a bigger GPU machine:
+```bash
+python model/train.py --profile big_machine
+```
+
+You can also override any setting with your own JSON file:
+```bash
+python model/train.py --profile big_machine --config /path/to/your_config.json
+```
+
+Model artifacts are saved in `model/saved/`:
+- `drawme_model.keras`
+- `drawme_model.h5`
+- `categories.json`
+- `training_history.json`
+- `training_metadata.json`
+- `resolved_config.json`
+
+Built-in profiles:
+- `model/configs/small_machine.json`: smaller batch/data/model defaults
+- `model/configs/big_machine.json`: larger model + mixed precision for stronger GPUs
+
+Quick runtime check without training:
+```bash
+python model/train.py --profile big_machine --dry-run
+```
 
 ### 4. Start the App
 ```bash
@@ -79,6 +108,10 @@ Input (28×28×1)
 - **Optimizer**: Adam
 - **Loss**: Sparse Categorical Crossentropy
 - **Class Balancing**: 10,000 samples per category
+
+The training pipeline now supports profile-based architecture scaling:
+- Small machine profile: 3 conv blocks and moderate batch/data size
+- Big machine profile: deeper/wider CNN, larger dense head, more samples, and optional mixed precision
 
 ## 🔧 Image Preprocessing Pipeline
 

@@ -79,6 +79,15 @@ def load_history():
         return json.load(f)
 
 
+def load_metadata():
+    """Load optional training metadata if available."""
+    metadata_path = os.path.join(SAVE_DIR, "training_metadata.json")
+    if not os.path.exists(metadata_path):
+        return {}
+    with open(metadata_path, "r") as f:
+        return json.load(f)
+
+
 def create_accuracy_chart(history):
     """Chart 1: Training & Validation Accuracy over Epochs."""
     fig, ax = plt.subplots(figsize=(12, 7))
@@ -281,13 +290,20 @@ def create_epoch_improvement_chart(history):
     print("  ✓ 05_epoch_improvement.png")
 
 
-def create_dataset_overview(history):
+def create_dataset_overview(history, metadata=None):
     """Chart 6: Dataset composition and sizes."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
-    
-    samples_per_class = 20000
-    total_samples = samples_per_class * len(CATEGORIES)
-    train_samples = int(total_samples * 0.8)
+
+    metadata = metadata or {}
+    dataset_meta = metadata.get("dataset", {})
+    training_meta = metadata.get("training", {})
+
+    samples_per_class = int(dataset_meta.get("samples_per_class", 20000))
+    categories_count = int(dataset_meta.get("categories", len(CATEGORIES)))
+    test_split = float(training_meta.get("test_split", 0.2))
+
+    total_samples = samples_per_class * categories_count
+    train_samples = int(total_samples * (1.0 - test_split))
     test_samples = total_samples - train_samples
     
     # Donut chart for train/test split
@@ -643,7 +659,8 @@ def main():
     create_learning_rate_chart(history)
     create_overfitting_gap_chart(history)
     create_epoch_improvement_chart(history)
-    create_dataset_overview(history)
+    metadata = load_metadata()
+    create_dataset_overview(history, metadata)
     create_model_architecture_chart()
     create_training_summary_dashboard(history)
     create_training_phases_chart(history)

@@ -1,0 +1,29 @@
+{
+  "runtime": {
+    "mixed_precision": false,
+    "gpu": {
+      "enable": true,
+      "memory_growth": true
+    }
+  },
+  "data": {
+    "samples_per_class": 12000
+  },
+  "model": {
+    "name": "DrawMe_CNN_small",
+    "conv_filters": [32, 64, 128],
+    "dense_units": [256],
+    "dropout": 0.35,
+    "learning_rate": 0.001
+  },
+  "training": {
+    "epochs": 30,
+    "batch_size": 128,
+    "test_split": 0.2,
+    "validation_split": 0.1,
+    "lr_factor": 0.5,
+    "lr_patience": 3,
+    "min_lr": 1e-6,
+    "early_stopping_patience": 7
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "runtime": {
+    "mixed_precision": true,
+    "gpu": {
+      "enable": true,
+      "memory_growth": true
+    }
+  },
+  "data": {
+    "samples_per_class": 30000
+  },
+  "augmentation": {
+    "rotation": 0.1,
+    "translation_height": 0.12,
+    "translation_width": 0.12,
+    "zoom": 0.12
+  },
+  "model": {
+    "name": "DrawMe_CNN_big",
+    "conv_filters": [64, 128, 256, 384],
+    "dense_units": [512, 256],
+    "dropout": 0.4,
+    "learning_rate": 0.0007
+  },
+  "training": {
+    "epochs": 50,
+    "batch_size": 256,
+    "test_split": 0.2,
+    "validation_split": 0.1,
+    "lr_factor": 0.5,
+    "lr_patience": 3,
+    "min_lr": 5e-7,
+    "early_stopping_patience": 10
+  }
+}
