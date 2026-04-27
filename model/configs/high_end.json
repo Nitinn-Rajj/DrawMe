@@ -7,29 +7,29 @@
     }
   },
   "data": {
-    "samples_per_class": 30000
+    "samples_per_class": 200000
   },
   "augmentation": {
-    "rotation": 0.1,
-    "translation_height": 0.12,
-    "translation_width": 0.12,
-    "zoom": 0.12
+    "rotation": 0.09,
+    "translation_height": 0.1,
+    "translation_width": 0.1,
+    "zoom": 0.1
   },
   "model": {
-    "name": "DrawMe_CNN_big",
-    "conv_filters": [64, 128, 256, 384],
-    "dense_units": [512, 256],
-    "dropout": 0.4,
-    "learning_rate": 0.0007
+    "name": "DrawMe_CNN_high_end_v2",
+    "conv_filters": [80, 160, 256, 384],
+    "dense_units": [640, 320],
+    "dropout": 0.35,
+    "learning_rate": 0.0005
   },
   "training": {
-    "epochs": 50,
+    "epochs": 3,
     "batch_size": 256,
     "test_split": 0.2,
     "validation_split": 0.1,
     "lr_factor": 0.5,
     "lr_patience": 3,
     "min_lr": 5e-7,
-    "early_stopping_patience": 10
+    "early_stopping_patience": 6
   }
 }

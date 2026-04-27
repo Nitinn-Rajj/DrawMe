@@ -1,16 +1,45 @@
 """DrawMe training pipeline with profile-based config and GPU support."""
 
 import argparse
+import ctypes
+import glob
 import json
 import os
 import random
+import site
 import sys
+import time
 from datetime import datetime
 
 import numpy as np
 from sklearn.model_selection import train_test_split
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+
+def preload_cuda_libraries():
+    """Preload NVIDIA pip-package shared libraries so TensorFlow can use GPU."""
+    lib_dirs = []
+    for root in site.getsitepackages() + [site.getusersitepackages()]:
+        lib_dirs.extend(glob.glob(os.path.join(root, "nvidia", "*", "lib")))
+
+    loaded_count = 0
+    for lib_dir in sorted(set(lib_dirs)):
+        if not os.path.isdir(lib_dir):
+            continue
+        for so_path in sorted(glob.glob(os.path.join(lib_dir, "lib*.so*"))):
+            try:
+                ctypes.CDLL(so_path, mode=ctypes.RTLD_GLOBAL)
+                loaded_count += 1
+            except OSError:
+                # Some optional libs may not load on every platform; ignore safely.
+                pass
+
+    if loaded_count:
+        print(f"[Runtime] Preloaded {loaded_count} CUDA shared libraries")
+
+
+preload_cuda_libraries()
 
 import tensorflow as tf
 from tensorflow import keras
@@ -19,13 +48,54 @@ from tensorflow.keras import callbacks, layers
 from config import load_training_config
 
 
+class EpochTimingCallback(callbacks.Callback):
+    """Collect per-epoch timing so throughput can be tracked between runs."""
+
+    def on_train_begin(self, logs=None):
+        self.epoch_durations_sec = []
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self._epoch_start = time.perf_counter()
+
+    def on_epoch_end(self, epoch, logs=None):
+        duration = float(time.perf_counter() - self._epoch_start)
+        self.epoch_durations_sec.append(duration)
+
+
+class NumpyBatchSequence(keras.utils.Sequence):
+    """Memory-safe batch loader that avoids giant tensor materialization."""
+
+    def __init__(self, x, y, indices, batch_size, shuffle=False, seed=42):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.indices = np.asarray(indices, dtype=np.int64)
+        self.batch_size = int(batch_size)
+        self.shuffle = bool(shuffle)
+        self.rng = np.random.default_rng(int(seed))
+        self.order = self.indices.copy()
+        if self.shuffle:
+            self.rng.shuffle(self.order)
+
+    def __len__(self):
+        return int(np.ceil(len(self.order) / self.batch_size))
+
+    def __getitem__(self, idx):
+        start = idx * self.batch_size
+        end = min((idx + 1) * self.batch_size, len(self.order))
+        batch_idx = self.order[start:end]
+        return self.x[batch_idx], self.y[batch_idx]
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            self.rng.shuffle(self.order)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train DrawMe CNN with selectable config profiles.")
     parser.add_argument(
         "--profile",
-        default="small_machine",
-        choices=["small_machine", "big_machine"],
-        help="Built-in training profile to start from.",
+        default="default",
     )
     parser.add_argument(
         "--config",
@@ -87,9 +157,19 @@ def load_data(cfg):
     categories = data_cfg["categories"]
     data_dir = cfg["paths"]["data_dir"]
     samples_per_class = int(data_cfg["samples_per_class"])
+    safe_cap = int(data_cfg.get("safe_samples_per_class_cap", 0))
+    if safe_cap > 0 and samples_per_class > safe_cap:
+        print(
+            f"[WARN] samples_per_class={samples_per_class:,} is too high for stable training; "
+            f"capping to {safe_cap:,}."
+        )
+        samples_per_class = safe_cap
+        cfg["data"]["samples_per_class"] = samples_per_class
+
     img_size = int(data_cfg["img_size"])
     seed = int(cfg["runtime"]["seed"])
     rng = np.random.default_rng(seed)
+    use_mixed_precision = bool(cfg["runtime"].get("mixed_precision", False))
 
     x_all = []
     y_all = []
@@ -122,14 +202,15 @@ def load_data(cfg):
         x_all.append(arr)
         y_all.append(np.full(arr.shape[0], idx))
 
-    x = np.concatenate(x_all, axis=0).astype("float32")
-    y = np.concatenate(y_all, axis=0)
+    x_dtype = "float16" if use_mixed_precision else "float32"
+    x = np.concatenate(x_all, axis=0).astype(x_dtype)
+    y = np.concatenate(y_all, axis=0).astype("int32")
 
     permutation = rng.permutation(len(x))
     x = x[permutation]
     y = y[permutation]
 
-    x /= 255.0
+    x /= np.array(255.0, dtype=x.dtype)
     x = x.reshape(-1, img_size, img_size, 1)
 
     print(f"\n[Data] Total samples: {x.shape[0]:,}")
@@ -221,7 +302,8 @@ def build_model(cfg):
 
 def build_callbacks(cfg, save_dir):
     tr_cfg = cfg["training"]
-    cb = [callbacks.TerminateOnNaN()]
+    timing_cb = EpochTimingCallback()
+    cb = [callbacks.TerminateOnNaN(), timing_cb]
 
     cb.append(
         callbacks.ReduceLROnPlateau(
@@ -249,10 +331,10 @@ def build_callbacks(cfg, save_dir):
             verbose=1,
         )
     )
-    return cb
+    return cb, timing_cb
 
 
-def save_artifacts(cfg, runtime_info, history, model, test_metrics):
+def save_artifacts(cfg, runtime_info, history, model, test_metrics, epoch_durations_sec):
     save_dir = cfg["paths"]["save_dir"]
     os.makedirs(save_dir, exist_ok=True)
 
@@ -287,6 +369,12 @@ def save_artifacts(cfg, runtime_info, history, model, test_metrics):
             "test_loss": float(test_metrics[0]),
             "test_accuracy": float(test_metrics[1]),
         },
+        "timing": {
+            "epochs_ran": len(epoch_durations_sec),
+            "epoch_durations_sec": [float(v) for v in epoch_durations_sec],
+            "total_training_sec": float(np.sum(epoch_durations_sec)) if epoch_durations_sec else 0.0,
+            "avg_epoch_sec": float(np.mean(epoch_durations_sec)) if epoch_durations_sec else 0.0,
+        },
     }
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
@@ -317,15 +405,50 @@ def train(cfg):
     x, y = load_data(cfg)
 
     tr_cfg = cfg["training"]
-    x_train, x_test, y_train, y_test = train_test_split(
-        x,
-        y,
+    all_indices = np.arange(len(x), dtype=np.int64)
+    train_indices, test_indices = train_test_split(
+        all_indices,
         test_size=float(tr_cfg["test_split"]),
         random_state=int(cfg["runtime"]["seed"]),
         stratify=y,
     )
-    print(f"\n[Split] Train: {x_train.shape[0]:,} samples")
-    print(f"[Split] Test:  {x_test.shape[0]:,} samples")
+
+    train_fit_indices, val_indices = train_test_split(
+        train_indices,
+        test_size=float(tr_cfg["validation_split"]),
+        random_state=int(cfg["runtime"]["seed"]),
+        stratify=y[train_indices],
+    )
+
+    batch_size = int(tr_cfg["batch_size"])
+    train_seq = NumpyBatchSequence(
+        x=x,
+        y=y,
+        indices=train_fit_indices,
+        batch_size=batch_size,
+        shuffle=True,
+        seed=int(cfg["runtime"]["seed"]),
+    )
+    val_seq = NumpyBatchSequence(
+        x=x,
+        y=y,
+        indices=val_indices,
+        batch_size=batch_size,
+        shuffle=False,
+        seed=int(cfg["runtime"]["seed"]),
+    )
+    test_seq = NumpyBatchSequence(
+        x=x,
+        y=y,
+        indices=test_indices,
+        batch_size=batch_size,
+        shuffle=False,
+        seed=int(cfg["runtime"]["seed"]),
+    )
+
+    print(f"\n[Split] Train: {len(train_fit_indices):,} samples")
+    print(f"[Split] Val:   {len(val_indices):,} samples")
+    print(f"[Split] Test:  {len(test_indices):,} samples")
 
     model = build_model(cfg)
     print("\n[Model] Summary")
@@ -333,25 +456,28 @@ def train(cfg):
 
     save_dir = cfg["paths"]["save_dir"]
     os.makedirs(save_dir, exist_ok=True)
-    cb_list = build_callbacks(cfg, save_dir)
+    cb_list, timing_cb = build_callbacks(cfg, save_dir)
 
     print(f"\n[Train] Starting training for up to {tr_cfg['epochs']} epochs")
     history = model.fit(
-        x_train,
-        y_train,
+        train_seq,
         epochs=int(tr_cfg["epochs"]),
-        batch_size=int(tr_cfg["batch_size"]),
-        validation_split=float(tr_cfg["validation_split"]),
+        validation_data=val_seq,
         callbacks=cb_list,
         verbose=1,
     )
 
+    epoch_durations_sec = timing_cb.epoch_durations_sec
+    if epoch_durations_sec:
+        print(f"[Train] Avg epoch time: {np.mean(epoch_durations_sec):.2f}s")
+        print(f"[Train] Total train time: {np.sum(epoch_durations_sec):.2f}s")
+
     print("\n[Eval] Running test evaluation...")
-    test_loss, test_acc = model.evaluate(x_test, y_test, verbose=0)
+    test_loss, test_acc = model.evaluate(test_seq, verbose=0)
     print(f"[Eval] Test loss: {test_loss:.4f}")
     print(f"[Eval] Test accuracy: {test_acc:.4f} ({test_acc * 100:.2f}%)")
 
-    save_artifacts(cfg, runtime_info, history, model, (test_loss, test_acc))
+    save_artifacts(cfg, runtime_info, history, model, (test_loss, test_acc), epoch_durations_sec)
 
     print("\n" + "=" * 72)
     print("Training complete")

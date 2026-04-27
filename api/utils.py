@@ -56,34 +56,35 @@ def preprocess_canvas_image(base64_string: str, target_size: int = 28, debug: bo
     if debug:
         image.save(os.path.join(debug_dir, "01_raw.png"))
 
-    # 2. Composite onto white background, convert to grayscale
+    # 2. Composite onto white background and build a color-invariant ink map.
+    # Using grayscale directly makes bright colors (e.g., yellow) almost vanish
+    # after inversion; min(R,G,B) preserves stroke strength for all brush colors.
     background = Image.new("RGBA", image.size, (255, 255, 255, 255))
     background.paste(image, mask=image)
-    image = background.convert("L")
+
+    rgba = np.array(background).astype("float32")
+    rgb = rgba[:, :, :3]
+    alpha = rgba[:, :, 3] / 255.0
+    ink = (255.0 - np.min(rgb, axis=2)) * alpha
+    image = Image.fromarray(np.clip(ink, 0, 255).astype("uint8"), mode="L")
 
     if debug:
         image.save(os.path.join(debug_dir, "02_grayscale.png"))
 
-    # 3. Invert: black-on-white → white-on-black
-    image = ImageOps.invert(image)
-
-    if debug:
-        image.save(os.path.join(debug_dir, "03_inverted.png"))
-
-    # 4. Threshold to clean up anti-aliasing noise
+    # 3. Threshold to clean up anti-aliasing noise
     img_array = np.array(image).astype("float32")
-    # Apply a threshold — anything below 30 is noise
-    img_array[img_array < 30] = 0
+    # Keep thin anti-aliased edges while removing faint noise.
+    img_array[img_array < 12] = 0
 
     if debug:
-        Image.fromarray(img_array.astype("uint8")).save(os.path.join(debug_dir, "04_thresholded.png"))
+        Image.fromarray(img_array.astype("uint8")).save(os.path.join(debug_dir, "03_ink_thresholded.png"))
 
     # Check for empty canvas
     coords = np.argwhere(img_array > 0)
     if coords.size == 0:
         return np.zeros((1, target_size, target_size, 1), dtype="float32")
 
-    # 5. Bounding box crop
+    # 4. Bounding box crop
     y_min, x_min = coords.min(axis=0)
     y_max, x_max = coords.max(axis=0)
 
@@ -101,9 +102,9 @@ def preprocess_canvas_image(base64_string: str, target_size: int = 28, debug: bo
     cropped = img_array[y_min:y_max, x_min:x_max]
 
     if debug:
-        Image.fromarray(cropped.astype("uint8")).save(os.path.join(debug_dir, "05_cropped.png"))
+        Image.fromarray(cropped.astype("uint8")).save(os.path.join(debug_dir, "04_cropped.png"))
 
-    # 6. Pad to square
+    # 5. Pad to square
     h, w = cropped.shape
     max_dim = max(h, w)
     padded = np.zeros((max_dim, max_dim), dtype="float32")
@@ -112,18 +113,18 @@ def preprocess_canvas_image(base64_string: str, target_size: int = 28, debug: bo
     padded[pad_y:pad_y + h, pad_x:pad_x + w] = cropped
 
     if debug:
-        Image.fromarray(padded.astype("uint8")).save(os.path.join(debug_dir, "06_padded_square.png"))
+        Image.fromarray(padded.astype("uint8")).save(os.path.join(debug_dir, "05_padded_square.png"))
 
-    # 7. Resize to target_size × target_size
+    # 6. Resize to target_size × target_size
     img_pil = Image.fromarray(padded.astype("uint8"), mode="L")
     img_pil = img_pil.resize((target_size, target_size), Image.LANCZOS)
 
     if debug:
         # Save upscaled version for visibility
-        img_pil.save(os.path.join(debug_dir, "07_resized_28x28.png"))
-        img_pil.resize((280, 280), Image.NEAREST).save(os.path.join(debug_dir, "07_resized_280x280.png"))
+        img_pil.save(os.path.join(debug_dir, "06_resized_28x28.png"))
+        img_pil.resize((280, 280), Image.NEAREST).save(os.path.join(debug_dir, "06_resized_280x280.png"))
 
-    # 8. Center using center of mass
+    # 7. Center using center of mass
     # This is critical: Quick, Draw! data is centered by center of mass
     img_array = np.array(img_pil).astype("float32")
 
@@ -139,11 +140,11 @@ def preprocess_canvas_image(base64_string: str, target_size: int = 28, debug: bo
             img_array = ndimage.shift(img_array, [shift_y, shift_x], mode='constant', cval=0)
 
     if debug:
-        Image.fromarray(img_array.astype("uint8")).save(os.path.join(debug_dir, "08_centered.png"))
+        Image.fromarray(img_array.astype("uint8")).save(os.path.join(debug_dir, "07_centered.png"))
         Image.fromarray(img_array.astype("uint8")).resize((280, 280), Image.NEAREST).save(
-            os.path.join(debug_dir, "08_centered_280x280.png"))
+            os.path.join(debug_dir, "07_centered_280x280.png"))
 
-    # 9. Normalize to [0, 1]
+    # 8. Normalize to [0, 1]
     img_array = img_array / 255.0
 
     # Clamp to [0, 1]
@@ -158,7 +159,7 @@ def preprocess_canvas_image(base64_string: str, target_size: int = 28, debug: bo
         print(f"  Mean stroke brightness: {mean_nz:.2f}")
         print(f"  Min: {img_array.min():.3f}, Max: {img_array.max():.3f}")
 
-    # 10. Reshape to (1, 28, 28, 1)
+    # 9. Reshape to (1, 28, 28, 1)
     img_array = img_array.reshape(1, target_size, target_size, 1)
 
     return img_array

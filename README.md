@@ -58,18 +58,18 @@ Downloads 15 categories (~1.5 GB total) from Google Cloud Storage.
 
 ### 3. Train the Model
 ```bash
-python model/train.py --profile small_machine
+python model/train.py --profile default
 ```
 This runs the resource-friendly profile for smaller machines.
 
 For a bigger GPU machine:
 ```bash
-python model/train.py --profile big_machine
+python model/train.py --profile high_end
 ```
 
 You can also override any setting with your own JSON file:
 ```bash
-python model/train.py --profile big_machine --config /path/to/your_config.json
+python model/train.py --profile high_end --config /path/to/your_config.json
 ```
 
 Model artifacts are saved in `model/saved/`:
@@ -81,12 +81,12 @@ Model artifacts are saved in `model/saved/`:
 - `resolved_config.json`
 
 Built-in profiles:
-- `model/configs/small_machine.json`: smaller batch/data/model defaults
-- `model/configs/big_machine.json`: larger model + mixed precision for stronger GPUs
+- `model/configs/default.json`: smaller batch/data/model defaults
+- `model/configs/high_end.json`: larger model + mixed precision for stronger GPUs
 
 Quick runtime check without training:
 ```bash
-python model/train.py --profile big_machine --dry-run
+python model/train.py --profile high_end --dry-run
 ```
 
 ### 4. Start the App

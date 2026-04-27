@@ -9,12 +9,39 @@ import io
 import json
 import base64
 import time
+import ctypes
+import glob
+import site
 import numpy as np
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import eventlet
 eventlet.monkey_patch()
+
+
+def preload_cuda_libraries():
+    """Preload NVIDIA pip-package shared libraries before importing TensorFlow."""
+    lib_dirs = []
+    for root in site.getsitepackages() + [site.getusersitepackages()]:
+        lib_dirs.extend(glob.glob(os.path.join(root, "nvidia", "*", "lib")))
+
+    loaded_count = 0
+    for lib_dir in sorted(set(lib_dirs)):
+        if not os.path.isdir(lib_dir):
+            continue
+        for so_path in sorted(glob.glob(os.path.join(lib_dir, "lib*.so*"))):
+            try:
+                ctypes.CDLL(so_path, mode=ctypes.RTLD_GLOBAL)
+                loaded_count += 1
+            except OSError:
+                pass
+
+    if loaded_count:
+        print(f"[Runtime] Preloaded {loaded_count} CUDA shared libraries")
+
+
+preload_cuda_libraries()
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -30,9 +57,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(BASE_DIR, "model", "saved")
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# Try .keras first (new format), then fall back to .h5
-MODEL_PATH_KERAS = os.path.join(MODEL_DIR, "drawme_model.keras")
-MODEL_PATH_H5 = os.path.join(MODEL_DIR, "drawme_model.h5")
+# Load only best-checkpoint artifacts.
+MODEL_PATH_KERAS = os.path.join(MODEL_DIR, "drawme_best.keras")
+MODEL_PATH_H5 = os.path.join(MODEL_DIR, "drawme_best.h5")
 CATEGORIES_PATH = os.path.join(MODEL_DIR, "categories.json")
 
 # ─── App Setup ───────────────────────────────────────────────────────────────

@@ -1,0 +1,9 @@
+{
+  "data": {
+    "samples_per_class": 4000
+  },
+  "training": {
+    "epochs": 1,
+    "batch_size": 128
+  }
+}

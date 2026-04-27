@@ -61,7 +61,7 @@ let lastY = 0;
 
 // Tool state
 let currentTool = "pencil";      // "pencil" | "eraser"
-let brushSize = 4;
+let brushSize = 12;
 let drawColor = "#000000";
 
 // Drawing history
