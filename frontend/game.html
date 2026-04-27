@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DrawMe Multiplayer — A real-time 1v1 AI drawing duel. Race to draw sketches recognized by a CNN.">
+    <title>DrawMe — Multiplayer Duel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="game.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="theme-light game-body">
+
+    <!-- ═══════════════════════════════════════════════════════════
+         LOBBY SCREEN
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="game-screen" id="lobbyScreen">
+        <div class="lobby-window">
+            <div class="title-bar">
+                <div class="title-bar-left">
+                    <div class="title-bar-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                            <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                            <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                            <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <span class="title-bar-text">DrawMe — Multiplayer Lobby</span>
+                </div>
+                <div class="title-bar-controls">
+                    <a href="/" class="title-btn" title="Back to single player">🏠</a>
+                </div>
+            </div>
+
+            <div class="lobby-body">
+                <div class="lobby-hero">
+                    <div class="lobby-hero-icon">🎨⚔️🎨</div>
+                    <h1 class="lobby-title">Drawing Duel</h1>
+                    <p class="lobby-desc">Race your opponent to draw words the AI can recognize!</p>
+                </div>
+
+                <!-- Player Name -->
+                <div class="lobby-section">
+                    <label class="lobby-label" for="playerNameInput">Your Name</label>
+                    <input type="text" id="playerNameInput" class="lobby-input" placeholder="Enter your name..." maxlength="20" value="">
+                </div>
+
+                <!-- Round Selector -->
+                <div class="lobby-section">
+                    <label class="lobby-label">Number of Rounds</label>
+                    <div class="round-selector" id="roundSelector">
+                        <button class="round-btn" data-rounds="3">3</button>
+                        <button class="round-btn active" data-rounds="5">5</button>
+                        <button class="round-btn" data-rounds="7">7</button>
+                    </div>
+                </div>
+
+                <!-- Timer Selector -->
+                <div class="lobby-section">
+                    <label class="lobby-label">Time Limit</label>
+                    <div class="round-selector" id="timerSelector">
+                        <button class="round-btn" data-timer="30">30s</button>
+                        <button class="round-btn active" data-timer="60">60s</button>
+                        <button class="round-btn" data-timer="90">90s</button>
+                        <button class="round-btn" data-timer="120">120s</button>
+                    </div>
+                </div>
+
+                <div class="lobby-divider"></div>
+
+                <!-- Create / Join -->
+                <div class="lobby-actions">
+                    <button class="lobby-btn lobby-btn-create" id="btnCreateRoom">
+                        <span class="lobby-btn-icon">🏠</span>
+                        <span>Create Room</span>
+                    </button>
+
+                    <div class="lobby-or">— OR —</div>
+
+                    <div class="lobby-join-row">
+                        <input type="text" id="roomCodeInput" class="lobby-input lobby-input-code" placeholder="ROOM CODE" maxlength="6">
+                        <button class="lobby-btn lobby-btn-join" id="btnJoinRoom">
+                            <span>Join</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Messages -->
+                <div class="lobby-status hidden" id="lobbyStatus">
+                    <span class="lobby-status-dot"></span>
+                    <span id="lobbyStatusText">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         WAITING ROOM SCREEN
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="game-screen hidden" id="waitingScreen">
+        <div class="lobby-window">
+            <div class="title-bar">
+                <div class="title-bar-left">
+                    <div class="title-bar-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                            <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                            <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                            <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <span class="title-bar-text">Waiting for Opponent</span>
+                </div>
+            </div>
+
+            <div class="lobby-body waiting-body">
+                <div class="waiting-room-code">
+                    <span class="waiting-label">Room Code</span>
+                    <div class="room-code-display" id="roomCodeDisplay">------</div>
+                    <button class="lobby-btn lobby-btn-small" id="btnCopyCode" title="Copy room code">📋 Copy</button>
+                </div>
+
+                <div class="waiting-players" id="waitingPlayers">
+                    <div class="waiting-player" id="waitingP1">
+                        <span class="waiting-player-icon">🎨</span>
+                        <span class="waiting-player-name" id="waitingP1Name">You</span>
+                        <span class="waiting-player-status ready">✓ Ready</span>
+                    </div>
+                    <div class="waiting-vs">VS</div>
+                    <div class="waiting-player" id="waitingP2">
+                        <span class="waiting-player-icon">⏳</span>
+                        <span class="waiting-player-name" id="waitingP2Name">Waiting...</span>
+                        <span class="waiting-player-status" id="waitingP2Status"></span>
+                    </div>
+                </div>
+
+                <div class="waiting-info">
+                    <p>Share the room code with your opponent</p>
+                    <p class="waiting-sub">Game starts when both players are ready</p>
+                </div>
+
+                <button class="lobby-btn lobby-btn-create" id="btnReady" disabled>
+                    <span>✓ Ready</span>
+                </button>
+
+                <button class="lobby-btn lobby-btn-leave" id="btnLeaveRoom">
+                    ← Leave Room
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         GAME SCREEN
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="game-screen hidden" id="gameScreen">
+        <div class="game-window">
+            <div class="title-bar">
+                <div class="title-bar-left">
+                    <div class="title-bar-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                            <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                            <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                            <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <span class="title-bar-text">DrawMe — Duel in Progress</span>
+                </div>
+            </div>
+
+            <!-- Timer Bar -->
+            <div class="game-timer-bar">
+                <div class="game-timer-fill" id="timerFill"></div>
+                <span class="game-timer-text" id="timerText">60</span>
+            </div>
+
+            <div class="game-body">
+                <!-- Left Panel: Your Drawing Area -->
+                <div class="game-draw-area">
+                    <!-- Target Word -->
+                    <div class="game-target">
+                        <span class="game-target-label">Draw:</span>
+                        <span class="game-target-word" id="targetWord">—</span>
+                        <span class="game-round-info" id="roundInfo">Round 1/5</span>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div class="game-canvas-frame" id="gameCanvasFrame">
+                        <canvas id="gameCanvas" width="480" height="480"></canvas>
+                    </div>
+
+                    <!-- Canvas Controls -->
+                    <div class="game-canvas-controls">
+                        <button class="game-ctrl-btn" id="gameBtnClear" title="Clear canvas">🗑️ Clear</button>
+                        <button class="game-ctrl-btn" id="gameBtnUndo" title="Undo">↩ Undo</button>
+                        <div class="game-brush-sizes">
+                            <button class="game-brush-btn" data-size="3" title="Small">
+                                <span class="brush-dot" style="width:4px;height:4px"></span>
+                            </button>
+                            <button class="game-brush-btn active" data-size="5" title="Medium">
+                                <span class="brush-dot" style="width:7px;height:7px"></span>
+                            </button>
+                            <button class="game-brush-btn" data-size="10" title="Large">
+                                <span class="brush-dot" style="width:11px;height:11px"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Game Info -->
+                <div class="game-info-panel">
+                    <!-- Live Prediction -->
+                    <div class="game-prediction-box">
+                        <div class="game-pred-header">
+                            <span class="game-pred-label">🧠 AI sees:</span>
+                        </div>
+                        <div class="game-pred-top">
+                            <span class="game-pred-name" id="livePredName">—</span>
+                            <div class="game-pred-conf-bar">
+                                <div class="game-pred-conf-fill" id="livePredFill"></div>
+                            </div>
+                            <span class="game-pred-conf-pct" id="livePredPct">0%</span>
+                        </div>
+                        <div class="game-pred-list" id="livePredList">
+                            <!-- Top 3 predictions -->
+                        </div>
+                        <div class="game-pred-match hidden" id="predMatchIndicator">
+                            <span>✨ Match! Moving to next word...</span>
+                        </div>
+                    </div>
+
+                    <!-- Your Progress -->
+                    <div class="game-progress-section">
+                        <div class="game-progress-header">
+                            <span>🎨 You</span>
+                            <span class="game-progress-count" id="yourProgressCount">0/5</span>
+                        </div>
+                        <div class="game-progress-dots" id="yourProgressDots">
+                            <!-- Dynamically filled -->
+                        </div>
+                    </div>
+
+                    <!-- Opponent Progress -->
+                    <div class="game-progress-section game-progress-opponent">
+                        <div class="game-progress-header">
+                            <span>⚔️ <span id="opponentName">Opponent</span></span>
+                            <span class="game-progress-count" id="oppProgressCount">0/5</span>
+                        </div>
+                        <div class="game-progress-dots" id="oppProgressDots">
+                            <!-- Dynamically filled -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         RESULTS SCREEN
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="game-screen hidden" id="resultsScreen">
+        <div class="lobby-window results-window">
+            <div class="title-bar">
+                <div class="title-bar-left">
+                    <div class="title-bar-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                            <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                            <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                            <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <span class="title-bar-text">Game Over</span>
+                </div>
+            </div>
+
+            <div class="lobby-body results-body">
+                <div class="results-hero" id="resultsHero">
+                    <div class="results-trophy" id="resultsTrophy">🏆</div>
+                    <h1 class="results-title" id="resultsTitle">You Win!</h1>
+                    <p class="results-subtitle" id="resultsSubtitle">Congratulations!</p>
+                </div>
+
+                <div class="results-stats" id="resultsStats">
+                    <!-- Dynamically filled -->
+                </div>
+
+                <div class="results-words" id="resultsWords">
+                    <h3>Word Sequence</h3>
+                    <div class="results-word-list" id="resultsWordList"></div>
+                </div>
+
+                <div class="results-actions">
+                    <button class="lobby-btn lobby-btn-create" id="btnPlayAgain">
+                        🔄 Play Again
+                    </button>
+                    <a href="/" class="lobby-btn lobby-btn-leave">
+                        🏠 Back to DrawMe
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

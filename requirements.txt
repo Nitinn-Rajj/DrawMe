@@ -1,0 +1,13 @@
+numpy
+tensorflow
+flask
+flask-cors
+flask-socketio
+eventlet
+python-socketio
+matplotlib
+opencv-python-headless
+h5py
+scikit-learn
+Pillow
+requests

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DrawMe — An AI-powered sketch recognition app inspired by Microsoft Paint. Draw on the canvas and let a CNN identify your doodle.">
+    <title>DrawMe — AI Sketch Recognition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-light">
+
+    <!-- Window Container (like a classic Windows app) -->
+    <div class="window-container" id="windowContainer">
+
+        <!-- Title Bar -->
+        <div class="title-bar" id="titleBar">
+            <div class="title-bar-left">
+                <div class="title-bar-icon">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                        <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                        <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                        <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                    </svg>
+                </div>
+                <span class="title-bar-text">DrawMe — AI Sketch Recognition</span>
+            </div>
+            <div class="title-bar-controls">
+                <button class="title-btn" id="btnThemeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+                    <svg class="theme-icon-light" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/>
+                    </svg>
+                    <svg class="theme-icon-dark" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
+                        <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2"/>
+                        <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2"/>
+                        <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="title-btn title-btn-minimize" aria-label="Minimize">─</button>
+                <button class="title-btn title-btn-maximize" aria-label="Maximize">□</button>
+                <button class="title-btn title-btn-close" aria-label="Close">✕</button>
+            </div>
+        </div>
+
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-bar-left">
+                <div class="menu-item" data-menu="file">
+                    <span class="menu-label"><u>F</u>ile</span>
+                    <div class="menu-dropdown">
+                        <button class="menu-option" id="menuNew">
+                            <span class="menu-option-label">New</span>
+                            <span class="menu-shortcut">Ctrl+N</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-option" id="menuSave">
+                            <span class="menu-option-label">Save As PNG...</span>
+                            <span class="menu-shortcut">Ctrl+S</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-option" id="menuPredict">
+                            <span class="menu-option-label">Ask AI...</span>
+                            <span class="menu-shortcut">Enter</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="edit">
+                    <span class="menu-label"><u>E</u>dit</span>
+                    <div class="menu-dropdown">
+                        <button class="menu-option" id="menuUndo">
+                            <span class="menu-option-label">Undo</span>
+                            <span class="menu-shortcut">Ctrl+Z</span>
+                        </button>
+                        <button class="menu-option" id="menuRedo">
+                            <span class="menu-option-label">Redo</span>
+                            <span class="menu-shortcut">Ctrl+Y</span>
+                        </button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-option" id="menuClear">
+                            <span class="menu-option-label">Clear Canvas</span>
+                            <span class="menu-shortcut">Esc</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="view">
+                    <span class="menu-label"><u>V</u>iew</span>
+                    <div class="menu-dropdown">
+                        <button class="menu-option" id="menuGrid">
+                            <span class="menu-option-check" id="gridCheck">☐</span>
+                            <span class="menu-option-label">Show Grid</span>
+                        </button>
+                        <button class="menu-option" id="menuHistory">
+                            <span class="menu-option-check" id="historyCheck">☐</span>
+                            <span class="menu-option-label">Prediction History</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="help">
+                    <span class="menu-label"><u>H</u>elp</span>
+                    <div class="menu-dropdown">
+                        <button class="menu-option" id="menuAbout">
+                            <span class="menu-option-label">About DrawMe</span>
+                        </button>
+                        <button class="menu-option" id="menuShortcuts">
+                            <span class="menu-option-label">Keyboard Shortcuts</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="app-body">
+
+            <!-- Left Toolbar -->
+            <div class="toolbar" id="toolbar">
+                <div class="tool-group">
+                    <span class="tool-group-label">Tools</span>
+                    <button class="tool-btn active" id="toolPencil" title="Pencil (P)" data-tool="pencil">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" id="toolEraser" title="Eraser (E)" data-tool="eraser">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 20H7L3 16c-.8-.8-.8-2 0-2.8l10-10c.8-.8 2-.8 2.8 0l5.2 5.2c.8.8.8 2 0 2.8L13 19"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="tool-group">
+                    <span class="tool-group-label">Brush Size</span>
+                    <div class="brush-sizes">
+                        <button class="brush-size-btn" data-size="2" title="2px">
+                            <span class="brush-dot" style="width:4px;height:4px"></span>
+                        </button>
+                        <button class="brush-size-btn active" data-size="4" title="4px">
+                            <span class="brush-dot" style="width:6px;height:6px"></span>
+                        </button>
+                        <button class="brush-size-btn" data-size="8" title="8px">
+                            <span class="brush-dot" style="width:10px;height:10px"></span>
+                        </button>
+                        <button class="brush-size-btn" data-size="12" title="12px">
+                            <span class="brush-dot" style="width:14px;height:14px"></span>
+                        </button>
+                        <button class="brush-size-btn" data-size="20" title="20px">
+                            <span class="brush-dot" style="width:18px;height:18px"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tool-group">
+                    <span class="tool-group-label">Colors</span>
+                    <div class="color-palette" id="colorPalette">
+                        <button class="color-swatch active" data-color="#000000" style="background:#000000" title="Black"></button>
+                        <button class="color-swatch" data-color="#808080" style="background:#808080" title="Gray"></button>
+                        <button class="color-swatch" data-color="#800000" style="background:#800000" title="Maroon"></button>
+                        <button class="color-swatch" data-color="#ff0000" style="background:#ff0000" title="Red"></button>
+                        <button class="color-swatch" data-color="#ff6600" style="background:#ff6600" title="Orange"></button>
+                        <button class="color-swatch" data-color="#ffff00" style="background:#ffff00" title="Yellow"></button>
+                        <button class="color-swatch" data-color="#00ff00" style="background:#00ff00" title="Lime"></button>
+                        <button class="color-swatch" data-color="#008000" style="background:#008000" title="Green"></button>
+                        <button class="color-swatch" data-color="#00ffff" style="background:#00ffff" title="Cyan"></button>
+                        <button class="color-swatch" data-color="#0000ff" style="background:#0000ff" title="Blue"></button>
+                        <button class="color-swatch" data-color="#000080" style="background:#000080" title="Navy"></button>
+                        <button class="color-swatch" data-color="#800080" style="background:#800080" title="Purple"></button>
+                        <button class="color-swatch" data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
+                        <button class="color-swatch" data-color="#ffffff" style="background:#ffffff" title="White"></button>
+                    </div>
+                    <div class="active-colors">
+                        <div class="active-color-preview" id="activeColorPreview" title="Current color">
+                            <div class="active-color-inner" style="background:#000000"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tool-separator"></div>
+
+                <div class="tool-group">
+                    <span class="tool-group-label">Actions</span>
+                    <button class="tool-action-btn" id="btnUndo" title="Undo (Ctrl+Z)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 102.13-9.36L1 10"></path>
+                        </svg>
+                        <span>Undo</span>
+                    </button>
+                    <button class="tool-action-btn" id="btnRedo" title="Redo (Ctrl+Y)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 11-2.13-9.36L23 10"></path>
+                        </svg>
+                        <span>Redo</span>
+                    </button>
+                    <button class="tool-action-btn tool-action-danger" id="btnClear" title="Clear (Esc)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                        </svg>
+                        <span>Clear</span>
+                    </button>
+                </div>
+
+                <div class="tool-separator"></div>
+
+                <button class="predict-btn" id="btnPredict" title="Ask AI to predict (Enter)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 2L11 13"></path>
+                        <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                    </svg>
+                    <span>Predict</span>
+                </button>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-area" id="canvasArea">
+                <div class="canvas-frame" id="canvasFrame">
+                    <canvas id="drawCanvas" width="560" height="560"></canvas>
+                    <div class="canvas-grid-overlay hidden" id="canvasGrid"></div>
+                    <div class="canvas-placeholder" id="canvasPlaceholder">
+                        <span class="placeholder-pencil">&#9998;</span>
+                        <span class="placeholder-text">Draw something... the AI will guess it!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: AI Predictions -->
+            <div class="prediction-panel" id="predictionPanel">
+                <div class="panel-header-retro">
+                    <div class="panel-title-retro">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        <span>AI Guesses</span>
+                    </div>
+                    <div class="model-status" id="modelStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Checking...</span>
+                    </div>
+                </div>
+
+                <!-- Prediction States -->
+                <div class="prediction-content" id="predictionContent">
+
+                    <!-- Empty State -->
+                    <div class="pred-state pred-empty" id="stateEmpty">
+                        <div class="empty-artwork">
+                            <div class="pixel-art-brain">
+                                <div class="brain-row"><span></span><span></span><span class="b"></span><span class="b"></span><span class="b"></span><span></span><span></span></div>
+                                <div class="brain-row"><span></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span></span></div>
+                                <div class="brain-row"><span class="b"></span><span class="b"></span><span></span><span class="b"></span><span></span><span class="b"></span><span class="b"></span></div>
+                                <div class="brain-row"><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span></div>
+                                <div class="brain-row"><span></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span class="b"></span><span></span></div>
+                                <div class="brain-row"><span></span><span></span><span class="b"></span><span class="b"></span><span class="b"></span><span></span><span></span></div>
+                            </div>
+                        </div>
+                        <h3 class="empty-title">Waiting for your drawing</h3>
+                        <p class="empty-desc">Draw on the canvas, then click <strong>Predict</strong> to see what the AI thinks it is.</p>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div class="pred-state pred-loading hidden" id="stateLoading">
+                        <div class="retro-loader">
+                            <div class="loader-text">AI is thinking</div>
+                            <div class="retro-progress-bar">
+                                <div class="retro-progress-fill" id="progressFill"></div>
+                                <div class="retro-progress-blocks">
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                    <span class="progress-block"></span>
+                                </div>
+                            </div>
+                            <div class="thinking-dots">
+                                <span>Analyzing</span>
+                                <span class="dot-anim">.</span><span class="dot-anim">.</span><span class="dot-anim">.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results State -->
+                    <div class="pred-state pred-results hidden" id="stateResults">
+                        <!-- Top Prediction -->
+                        <div class="top-guess" id="topGuess">
+                            <div class="top-guess-label">I think it's a...</div>
+                            <div class="top-guess-name" id="topGuessName">—</div>
+                            <div class="top-guess-bar">
+                                <div class="confidence-track">
+                                    <div class="confidence-fill" id="topConfFill"></div>
+                                </div>
+                                <span class="confidence-pct" id="topConfPct">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Debug Image -->
+                        <div class="debug-section hidden" id="debugSection">
+                            <span class="debug-label">Model sees:</span>
+                            <div class="debug-img-wrap" id="debugImgWrap"></div>
+                        </div>
+
+                        <!-- All Predictions -->
+                        <div class="predictions-list" id="predictionsList">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div class="pred-state pred-error hidden" id="stateError">
+                        <div class="error-box">
+                            <div class="error-icon-retro">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                            </div>
+                            <h3>Error</h3>
+                            <p id="errorMessage">Something went wrong.</p>
+                            <button class="retro-btn" id="btnRetry">Try Again</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prediction History (togglable) -->
+                <div class="history-section hidden" id="historySection">
+                    <div class="history-header">
+                        <span>Recent Predictions</span>
+                        <button class="history-clear-btn" id="btnClearHistory" title="Clear history">Clear</button>
+                    </div>
+                    <div class="history-list" id="historyList">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="categories-section">
+                    <div class="categories-header">Things I can recognize:</div>
+                    <div class="categories-grid" id="categoriesGrid">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar" id="statusBar">
+            <div class="status-section">
+                <span class="status-item" id="statusCoords">Pos: 0, 0</span>
+            </div>
+            <div class="status-section">
+                <span class="status-item" id="statusBrush">Brush: 4px</span>
+            </div>
+            <div class="status-section">
+                <span class="status-item" id="statusTool">Tool: Pencil</span>
+            </div>
+            <div class="status-section status-section-right">
+                <span class="status-item" id="statusModel">
+                    <span class="status-model-dot"></span>
+                    Model: Checking...
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Dialog -->
+    <div class="dialog-overlay hidden" id="aboutDialog">
+        <div class="dialog-box">
+            <div class="dialog-titlebar">
+                <span>About DrawMe</span>
+                <button class="dialog-close" id="aboutClose">✕</button>
+            </div>
+            <div class="dialog-body">
+                <div class="about-logo">
+                    <svg width="48" height="48" viewBox="0 0 16 16" fill="none">
+                        <rect x="1" y="1" width="6" height="6" fill="#3a6ea5"/>
+                        <rect x="9" y="1" width="6" height="6" fill="#3a6ea5" opacity="0.7"/>
+                        <rect x="1" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.5"/>
+                        <rect x="9" y="9" width="6" height="6" fill="#3a6ea5" opacity="0.3"/>
+                    </svg>
+                </div>
+                <h2>DrawMe v2.0</h2>
+                <p>AI-Powered Sketch Recognition</p>
+                <hr class="dialog-hr">
+                <p class="about-desc">Draw a doodle on the canvas and let the AI guess what it is. Built with TensorFlow &amp; Flask, trained on Google's Quick, Draw! dataset.</p>
+                <p class="about-copy">&copy; 2025 DrawMe. Made with care.</p>
+                <button class="retro-btn dialog-ok" id="aboutOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shortcuts Dialog -->
+    <div class="dialog-overlay hidden" id="shortcutsDialog">
+        <div class="dialog-box dialog-wide">
+            <div class="dialog-titlebar">
+                <span>Keyboard Shortcuts</span>
+                <button class="dialog-close" id="shortcutsClose">✕</button>
+            </div>
+            <div class="dialog-body">
+                <table class="shortcuts-table">
+                    <tr><td><kbd>Enter</kbd></td><td>Predict drawing</td></tr>
+                    <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo last stroke</td></tr>
+                    <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo stroke</td></tr>
+                    <tr><td><kbd>Ctrl+N</kbd></td><td>Clear canvas</td></tr>
+                    <tr><td><kbd>Ctrl+S</kbd></td><td>Save as PNG</td></tr>
+                    <tr><td><kbd>Esc</kbd></td><td>Clear canvas</td></tr>
+                    <tr><td><kbd>P</kbd></td><td>Pencil tool</td></tr>
+                    <tr><td><kbd>E</kbd></td><td>Eraser tool</td></tr>
+                    <tr><td><kbd>G</kbd></td><td>Toggle grid</td></tr>
+                </table>
+                <button class="retro-btn dialog-ok" id="shortcutsOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
